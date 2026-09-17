@@ -1,0 +1,11 @@
+{
+  "name": "yieldrent-platform",
+  "version": "1.0.0",
+  "description": "YieldRent - Smart Farmer Machinery Rental & Live Weather Monitoring System",
+  "scripts": {
+    "server": "cd server && npm start",
+    "client": "cd client && npm run dev",
+    "seed": "cd server && npm run seed",
+    "build": "cd client && npm run build"
+  }
+}
