@@ -1,47 +1,28 @@
-import { useState } from 'react';
-import {
-  Mail,
-  Lock,
-  User,
-  Phone,
-  MapPin,
-  Tractor,
-  Sprout,
-  Eye,
-  EyeOff,
-  X,
-  ArrowRight,
-  Loader2,
-  AlertCircle,
-} from 'lucide-react';
-import axios from 'axios';
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { X, Tractor, Sprout, Lock, Mail, User, Phone, MapPin, AlertCircle, Sparkles } from 'lucide-react';
 
-const AuthModal = ({ isOpen = true, onClose, onAuthSuccess }) => {
-  const [activeTab, setActiveTab] = useState('signin');
-  const [role, setRole] = useState('farmer');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSuccess }) {
+  const { login, register, demoLogin } = useAuth();
+  const [mode, setMode] = useState(initialMode); // 'login' or 'register'
+  const [role, setRole] = useState('farmer'); // 'farmer' or 'owner'
 
   const [formData, setFormData] = useState({
-    fullName: '',
+    name: '',
     email: '',
-    phone: '',
-    district: '',
     password: '',
+    phone: '',
+    location: 'Pune, Maharashtra'
   });
+
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-    if (error) setError('');
-  };
-
-  const switchTab = (tab) => {
-    setActiveTab(tab);
     setError('');
-    setShowPassword(false);
   };
 
   const handleSubmit = async (e) => {
@@ -50,323 +31,295 @@ const AuthModal = ({ isOpen = true, onClose, onAuthSuccess }) => {
     setLoading(true);
 
     try {
-      const endpoint =
-        activeTab === 'signin'
-          ? 'http://localhost:5000/api/auth/login'
-          : 'http://localhost:5000/api/auth/register';
-
-      const payload =
-        activeTab === 'signin'
-          ? {
-            email: formData.email,
-            password: formData.password,
-          }
-          : {
-            name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-            district: formData.district,
-            role,
-            password: formData.password,
-          };
-
-      const { data } = await axios.post(endpoint, payload);
-
-      if (data?.token) {
-        localStorage.setItem('yieldrent_token', data.token);
-      }
-      if (onAuthSuccess) {
-        onAuthSuccess(data);
-      }
-      if (onClose) {
-        onClose();
+      if (mode === 'login') {
+        const res = await login(formData.email, formData.password);
+        if (res.success) {
+          if (onSuccess) onSuccess(res.user);
+          onClose();
+        } else {
+          setError(res.message || 'Login failed. Please check your credentials.');
+        }
+      } else {
+        const res = await register({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role,
+          phone: formData.phone,
+          location: formData.location
+        });
+        if (res.success) {
+          if (onSuccess) onSuccess(res.user);
+          onClose();
+        } else {
+          setError(res.message || 'Registration failed. Please verify your details.');
+        }
       }
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-        'Authentication failed. Please check your credentials and try again.'
-      );
+      setError(err.response?.data?.message || 'A network error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemo = async (demoRole) => {
+    setError('');
+    setLoading(true);
+    try {
+      const res = await demoLogin(demoRole);
+      if (res.success) {
+        if (onSuccess) onSuccess(res.user);
+        onClose();
+      } else {
+        setError(res.message || 'Demo login failed.');
+      }
+    } catch (err) {
+      setError('Failed to initiate demo login.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
-        {/* Header */}
-        <div className="relative bg-gradient-to-r from-emerald-950 via-emerald-900 to-teal-950 px-6 py-5 border-b border-emerald-800/40">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-700 shadow-md">
-                <Sprout className="h-6 w-6" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold tracking-tight text-white">
-                  {activeTab === 'signin'
-                    ? 'Welcome Back to YieldRent'
-                    : 'Join YieldRent'}
-                </h2>
-                <p className="text-xs text-emerald-100/80">
-                  {activeTab === 'signin'
-                    ? 'Access your farm rentals, equipment listings & live advisories'
-                    : 'Rent modern farm machinery or list your fleet for income'}
-                </p>
-              </div>
-            </div>
+    <div className="fixed inset-0 z-[70] overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
+      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+        {/* Modal Header - Compact & Sticky with High-Contrast Close Button */}
+        <div className="relative bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-950 px-6 py-4 text-white shrink-0 border-b border-white/10">
+          {/* Prominent High-Contrast Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-3.5 right-3.5 z-30 bg-white/20 hover:bg-white text-white hover:text-slate-900 p-2 rounded-full backdrop-blur-md border border-white/30 shadow-md transition-all cursor-pointer focus:outline-hidden"
+            title="Close Dialog"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5 stroke-[2.5]" />
+          </button>
 
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close modal"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/25 text-zinc-300 transition hover:bg-black/45 hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+          <div className="flex items-center gap-3 pr-10">
+            <div className="w-11 h-11 bg-white rounded-xl p-0.5 shadow-md shrink-0 border border-white/30">
+              <img src="/logo.jpeg" alt="Logo" className="w-full h-full object-cover rounded-lg" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-black font-['Outfit'] leading-snug">
+                {mode === 'login' ? 'Welcome Back to YieldRent' : 'Create Free YieldRent Account'}
+              </h3>
+              <p className="text-[11px] text-emerald-200 font-medium leading-none mt-0.5">
+                {mode === 'login'
+                  ? 'Access your farm rentals, equipment listings & live advisories'
+                  : 'Join Maharashtra agricultural sharing network as a Farmer or Owner'}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="grid grid-cols-2 border-b border-zinc-800 bg-zinc-900/90">
+        {/* Tab Switcher */}
+        <div className="flex border-b border-slate-200 bg-slate-50 shrink-0">
           <button
             type="button"
-            onClick={() => switchTab('signin')}
-            className={`py-3.5 text-sm font-semibold transition border-b-2 ${activeTab === 'signin'
-                ? 'border-emerald-500 text-white bg-zinc-800/40'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-              }`}
+            onClick={() => { setMode('login'); setError(''); }}
+            className={`flex-1 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              mode === 'login'
+                ? 'border-emerald-600 text-emerald-800 bg-white shadow-xs'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
           >
             Sign In
           </button>
           <button
             type="button"
-            onClick={() => switchTab('signup')}
-            className={`py-3.5 text-sm font-semibold transition border-b-2 ${activeTab === 'signup'
-                ? 'border-emerald-500 text-white bg-zinc-800/40'
-                : 'border-transparent text-zinc-400 hover:text-zinc-200'
-              }`}
+            onClick={() => { setMode('register'); setError(''); }}
+            className={`flex-1 py-2.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              mode === 'register'
+                ? 'border-emerald-600 text-emerald-800 bg-white shadow-xs'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
           >
             Create Account
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Scrollable Form Body */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1">
           {error && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-300">
-              <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
+            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Sign Up Extra Fields */}
-          {activeTab === 'signup' && (
-            <>
-              <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-2">
-                  I want to register as a
-                </label>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setRole('farmer')}
-                    className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 px-3 text-xs font-semibold transition ${role === 'farmer'
-                        ? 'border-emerald-500 bg-emerald-500/15 text-emerald-300'
-                        : 'border-zinc-700 bg-zinc-800/60 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            {mode === 'register' && (
+              <>
+                {/* Role Picker */}
+                <div>
+                  <label className="block text-[11px] font-extrabold text-slate-700 mb-1.5 uppercase tracking-wider">
+                    Select Account Type:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRole('farmer')}
+                      className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                        role === 'farmer'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 text-slate-600'
                       }`}
-                  >
-                    <Sprout className="h-4 w-4" />
-                    Farmer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('owner')}
-                    className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 px-3 text-xs font-semibold transition ${role === 'owner'
-                        ? 'border-emerald-500 bg-emerald-500/15 text-emerald-300'
-                        : 'border-zinc-700 bg-zinc-800/60 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
-                      }`}
-                  >
-                    <Tractor className="h-4 w-4" />
-                    Machinery Owner
-                  </button>
-                </div>
-              </div>
+                    >
+                      <Sprout className={`w-5 h-5 shrink-0 ${role === 'farmer' ? 'text-emerald-600' : 'text-slate-400'}`} />
+                      <div>
+                        <p className="text-xs font-bold">Farmer</p>
+                        <p className="text-[10px] text-slate-500 leading-none">Rent equipment</p>
+                      </div>
+                    </button>
 
+                    <button
+                      type="button"
+                      onClick={() => setRole('owner')}
+                      className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer ${
+                        role === 'owner'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-900 font-bold shadow-xs'
+                          : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                      }`}
+                    >
+                      <Tractor className={`w-5 h-5 shrink-0 ${role === 'owner' ? 'text-emerald-600' : 'text-slate-400'}`} />
+                      <div>
+                        <p className="text-xs font-bold">Owner</p>
+                        <p className="text-[10px] text-slate-500 leading-none">List machinery</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Name & Phone in 2 Columns */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Full Name</label>
+                    <div className="relative">
+                      <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                      <input
+                        type="text"
+                        name="name"
+                        required
+                        value={formData.name}
+                        onChange={handleChange}
+                        placeholder="e.g. Rajesh Patil"
+                        className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Phone Number</label>
+                    <div className="relative">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                      <input
+                        type="tel"
+                        name="phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        placeholder="+91 9876543210"
+                        className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Email & Location in 2 Columns (or 1 column in login) */}
+            <div className={`grid ${mode === 'register' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} gap-2.5`}>
               <div>
-                <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                  Full Name
-                </label>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Email Address</label>
                 <div className="relative">
-                  <User className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                  <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                   <input
-                    type="text"
-                    name="fullName"
+                    type="email"
+                    name="email"
                     required
-                    value={formData.fullName}
+                    value={formData.email}
                     onChange={handleChange}
-                    placeholder="Rajesh Patil"
-                    className="w-full rounded-xl border border-zinc-700/80 bg-zinc-800/70 py-2.5 pl-10 pr-3.5 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    placeholder="farmer@example.com"
+                    className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {mode === 'register' && (
                 <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                    Phone Number
-                  </label>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">District / Location</label>
                   <div className="relative">
-                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                    <input
-                      type="tel"
-                      name="phone"
-                      required
-                      value={formData.phone}
-                      onChange={handleChange}
-                      placeholder="+91 98765 43210"
-                      className="w-full rounded-xl border border-zinc-700/80 bg-zinc-800/70 py-2.5 pl-10 pr-3 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-                    District / Location
-                  </label>
-                  <div className="relative">
-                    <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
                     <input
                       type="text"
-                      name="district"
-                      required
-                      value={formData.district}
+                      name="location"
+                      value={formData.location}
                       onChange={handleChange}
-                      placeholder="e.g., Nashik, Pune"
-                      className="w-full rounded-xl border border-zinc-700/80 bg-zinc-800/70 py-2.5 pl-10 pr-3 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      placeholder="Pune, Maharashtra"
+                      className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                     />
                   </div>
                 </div>
-              </div>
-            </>
-          )}
-
-          {/* Email Address */}
-          <div>
-            <label className="block text-xs font-medium text-zinc-300 mb-1.5">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-              <input
-                type="email"
-                name="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="farmer@example.com"
-                className="w-full rounded-xl border border-zinc-700/80 bg-zinc-800/70 py-2.5 pl-10 pr-3.5 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-medium text-zinc-300">
-                Password
-              </label>
-              {activeTab === 'signin' && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setError('Please contact your administrator to reset your password.')
-                  }
-                  className="text-xs text-emerald-400 hover:text-emerald-300 transition"
-                >
-                  Forgot password?
-                </button>
               )}
             </div>
-            <div className="relative">
-              <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                required
-                minLength={6}
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className="w-full rounded-xl border border-zinc-700/80 bg-zinc-800/70 py-2.5 pl-10 pr-10 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              />
+
+            {/* Password */}
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Password</label>
+              <div className="relative">
+                <Lock className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                <input
+                  type="password"
+                  name="password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-2.5 bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-300 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all text-xs flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {loading ? (
+                <span>Processing...</span>
+              ) : mode === 'login' ? (
+                <span>Sign In to YieldRent</span>
+              ) : (
+                <span>Complete Registration</span>
+              )}
+            </button>
+          </form>
+
+          {/* Quick Demo Logins Section */}
+          <div className="mt-4 pt-3.5 border-t border-slate-100">
+            <p className="text-center text-[10px] font-extrabold text-slate-400 mb-2 uppercase tracking-wider flex items-center justify-center gap-1">
+              <Sparkles className="w-3 h-3 text-amber-500" /> Instant Demo Access (No Password Needed)
+            </p>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200"
+                onClick={() => handleDemo('farmer')}
+                disabled={loading}
+                className="py-2 px-3 border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
+                <span>🌾</span> Demo Farmer
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemo('owner')}
+                disabled={loading}
+                className="py-2 px-3 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>🚜</span> Demo Owner
               </button>
             </div>
           </div>
-
-          {/* Primary Action Button */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 px-4 text-sm font-semibold text-white shadow-lg shadow-emerald-950/50 transition hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {activeTab === 'signin' ? 'Signing In...' : 'Creating Account...'}
-              </>
-            ) : (
-              <>
-                {activeTab === 'signin'
-                  ? 'Sign In to YieldRent'
-                  : 'Create YieldRent Account'}
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
-
-          {/* Footer Switch Link */}
-          <p className="pt-1 text-center text-xs text-zinc-400">
-            {activeTab === 'signin' ? (
-              <>
-                New to YieldRent?{' '}
-                <button
-                  type="button"
-                  onClick={() => switchTab('signup')}
-                  className="font-semibold text-emerald-400 hover:text-emerald-300"
-                >
-                  Create an account
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => switchTab('signin')}
-                  className="font-semibold text-emerald-400 hover:text-emerald-300"
-                >
-                  Sign in here
-                </button>
-              </>
-            )}
-          </p>
-        </form>
+        </div>
       </div>
     </div>
   );
-};
-
-export default AuthModal;
+}
